@@ -43,6 +43,12 @@ export const Navigation = (() => {
   let sectionObserver = null;
 
   /**
+   * Referencia al requestAnimationFrame activo para el cálculo de parallax vertical.
+   * @type {number | null}
+   */
+  let verticalRafId = null;
+
+  /**
    * Actualiza los puntos indicadores de posición (dots H0 / H1) dentro de una sección.
    * @param {HTMLElement} sectionElement - Elemento contenedor de la sección vertical (.section-v).
    * @param {number} activeIndex - Índice del panel activo (0 para izquierdo, 1 para derecho).
@@ -217,6 +223,69 @@ export const Navigation = (() => {
   };
 
   /**
+   * Actualiza el desplazamiento vertical contra-inercial de los textos (Vertical Counter-Parallax).
+   * Cuando un div sube, su texto desciende; y el div que entra desde abajo recibe su texto descendiendo desde arriba.
+   * Se ejecuta simultáneamente en ambos paneles hermanos (.panel-v-motion) para total independencia cartesiana.
+   * @returns {void}
+   */
+  const updateVerticalParallax = () => {
+    verticalRafId = null;
+
+    const viewportTrack = document.getElementById('viewportTrack');
+    if (!viewportTrack) return;
+
+    const trackHeight = viewportTrack.clientHeight || window.innerHeight;
+    if (trackHeight <= 0) return;
+
+    const trackRect = viewportTrack.getBoundingClientRect();
+    const travelMultiplier = 1.35;
+    const sections = viewportTrack.querySelectorAll('.section-v');
+
+    sections.forEach((section) => {
+      const rect = section.getBoundingClientRect();
+      const yRel = rect.top - trackRect.top;
+      const py = yRel / trackHeight;
+
+      // Cálculo del desplazamiento vertical contra-inercial:
+      // Py = 0 -> Sección centrada (yOffset = 0, opacity = 1)
+      // Py < 0 -> Sección saliendo hacia arriba (yOffset positivo: el texto desciende en sentido inverso)
+      // Py > 0 -> Sección entrando desde abajo (yOffset negativo: el texto desciende desde arriba)
+      let yOffset = 0;
+      let opacity = 1;
+
+      if (py <= -1) {
+        yOffset = travelMultiplier * trackHeight;
+        opacity = 0;
+      } else if (py >= 1) {
+        yOffset = -travelMultiplier * trackHeight;
+        opacity = 0;
+      } else {
+        yOffset = -py * (travelMultiplier * trackHeight);
+        opacity = Math.max(0, Math.min(1, 1 - Math.abs(py) * 1.25));
+      }
+
+      const motionWrappers = section.querySelectorAll('.panel-v-motion');
+      const transformStr = `translate3d(0, ${yOffset.toFixed(1)}px, 0)`;
+      const opacityStr = opacity.toFixed(2);
+
+      motionWrappers.forEach((wrapper) => {
+        /** @type {HTMLElement} */ (wrapper).style.transform = transformStr;
+        /** @type {HTMLElement} */ (wrapper).style.opacity = opacityStr;
+      });
+    });
+  };
+
+  /**
+   * Manejador pasivo del scroll en el track vertical con throttling por requestAnimationFrame.
+   * @returns {void}
+   */
+  const handleVerticalScroll = () => {
+    if (verticalRafId === null) {
+      verticalRafId = requestAnimationFrame(updateVerticalParallax);
+    }
+  };
+
+  /**
    * Inicializa los controles del menú desplegable inferior para dispositivos móviles.
    * Mantiene los íconos ocultos por defecto y expone un botón para desplegar/cerrar.
    * @returns {void}
@@ -340,7 +409,14 @@ export const Navigation = (() => {
     sectionObserver = new IntersectionObserver(handleIntersection, observerOptions);
     sections.forEach((section) => sectionObserver.observe(section));
 
-    // 4. Inicialización del menú táctil inferior en móvil
+    // 4. Cinemática Vertical: Counter-Parallax reactivo a 60fps
+    viewportTrack.addEventListener('scroll', handleVerticalScroll, { passive: true });
+    window.addEventListener('scroll', handleVerticalScroll, { passive: true });
+    window.addEventListener('resize', handleVerticalScroll, { passive: true });
+    updateVerticalParallax();
+    requestAnimationFrame(updateVerticalParallax);
+
+    // 5. Inicialización del menú táctil inferior en móvil
     setupMobileMenu();
   };
 
@@ -349,12 +425,20 @@ export const Navigation = (() => {
    * @returns {void}
    */
   const destroy = () => {
+    if (verticalRafId !== null) {
+      cancelAnimationFrame(verticalRafId);
+      verticalRafId = null;
+    }
+    window.removeEventListener('scroll', handleVerticalScroll);
+    window.removeEventListener('resize', handleVerticalScroll);
+
     if (sectionObserver) {
       sectionObserver.disconnect();
       sectionObserver = null;
     }
     const viewportTrack = document.getElementById('viewportTrack');
     if (viewportTrack) {
+      viewportTrack.removeEventListener('scroll', handleVerticalScroll);
       viewportTrack.removeEventListener('click', handleButtonClick);
       viewportTrack.removeEventListener('touchstart', handleTouchStart);
       viewportTrack.removeEventListener('touchend', handleTouchEnd);
