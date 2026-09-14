@@ -27,6 +27,7 @@ export const Navigation = (() => {
    */
   const CONFIG = Object.freeze({
     swipeThreshold: 40,
+    verticalSwipeThreshold: 18,
     intersectionThreshold: 0.55
   });
 
@@ -35,6 +36,18 @@ export const Navigation = (() => {
    * @type {TouchCoordinates | null}
    */
   let touchStartCoords = null;
+
+  /**
+   * Bloqueo de eje para el toque activo ('vertical' | 'horizontal' | null).
+   * @type {'vertical' | 'horizontal' | null}
+   */
+  let touchAxisLock = null;
+
+  /**
+   * Indica si ya se ejecutó un snap vertical durante el toque activo.
+   * @type {boolean}
+   */
+  let touchSnapTriggered = false;
 
   /**
    * Referencia al IntersectionObserver activo para reseteo y sincronización.
@@ -47,6 +60,12 @@ export const Navigation = (() => {
    * @type {number | null}
    */
   let verticalRafId = null;
+
+  /**
+   * Bandera para prevenir disparos múltiples mientras transiciona el snap vertical.
+   * @type {boolean}
+   */
+  let isSnapScrolling = false;
 
   /**
    * Actualiza los puntos indicadores de posición (dots H0 / H1) dentro de una sección.
@@ -123,6 +142,47 @@ export const Navigation = (() => {
   };
 
   /**
+   * Ejecuta un snap obligatorio y fluido a la sección vertical contigua (Plan B).
+   * Impide el arrastre manual paulatino en pantallas táctiles y fuerza un snap limpio
+   * idéntico al comportamiento cinemático de escritorio.
+   * @param {number} direction - Dirección del salto (+1 para siguiente sección, -1 para anterior).
+   * @returns {void}
+   */
+  const snapToSection = (direction) => {
+    const viewportTrack = document.getElementById('viewportTrack');
+    if (!viewportTrack) {
+      isSnapScrolling = false;
+      return;
+    }
+
+    const sections = viewportTrack.querySelectorAll('.section-v');
+    if (sections.length === 0) {
+      isSnapScrolling = false;
+      return;
+    }
+
+    const trackHeight = viewportTrack.clientHeight || window.innerHeight;
+    const currentIndex = Math.round(viewportTrack.scrollTop / trackHeight);
+    const targetIndex = Math.max(0, Math.min(sections.length - 1, currentIndex + direction));
+
+    if (targetIndex !== currentIndex) {
+      const targetSection = sections[targetIndex];
+      if (targetSection && typeof targetSection.scrollIntoView === 'function') {
+        targetSection.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        viewportTrack.scrollTo({ top: targetIndex * trackHeight, behavior: 'smooth' });
+      }
+      setTimeout(() => {
+        isSnapScrolling = false;
+      }, 650);
+    } else {
+      setTimeout(() => {
+        isSnapScrolling = false;
+      }, 200);
+    }
+  };
+
+  /**
    * Registra el punto de contacto inicial para el reconocimiento de gestos táctiles.
    * @param {TouchEvent} event - Evento táctil de inicio.
    * @returns {void}
@@ -130,6 +190,8 @@ export const Navigation = (() => {
   const handleTouchStart = (event) => {
     if (!event.touches || event.touches.length !== 1) {
       touchStartCoords = null;
+      touchAxisLock = null;
+      touchSnapTriggered = false;
       return;
     }
 
@@ -139,47 +201,111 @@ export const Navigation = (() => {
       y: touch.clientY,
       time: Date.now()
     };
+    touchAxisLock = null;
+    touchSnapTriggered = false;
   };
 
   /**
-   * Evalúa el desplazamiento del gesto táctil y aplica transición horizontal si cumple los criterios.
-   * @param {TouchEvent} event - Evento táctil de finalización.
+   * Manejador del movimiento táctil.
+   * Detecta tempranamente la intención vertical (desde 4px) y cancela el arrastre
+   * manual paulatino de forma ininterrumpida durante toda la pulsación (Plan B).
+   * @param {TouchEvent} event - Evento touchmove.
    * @returns {void}
    */
-  const handleTouchEnd = (event) => {
-    if (!touchStartCoords || !event.changedTouches || event.changedTouches.length === 0) {
-      touchStartCoords = null;
+  const handleTouchMove = (event) => {
+    // Si el toque ya fue bloqueado como vertical, SIEMPRE cancelamos el arrastre nativo,
+    // incluso después de haber ejecutado el snap y mientras el dedo siga apoyado
+    if (touchAxisLock === 'vertical') {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    }
+
+    if (!touchStartCoords || !event.touches || event.touches.length === 0) {
       return;
     }
 
-    const touch = event.changedTouches[0];
+    const touch = event.touches[0];
     const deltaX = touch.clientX - touchStartCoords.x;
     const deltaY = touch.clientY - touchStartCoords.y;
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
 
-    // Limpieza de coordenadas registradas
-    touchStartCoords = null;
+    // 1. Detección temprana de eje: Se bloquea con apenas 4px de desplazamiento vertical
+    if (!touchAxisLock) {
+      if (absDeltaY > absDeltaX && absDeltaY >= 4) {
+        touchAxisLock = 'vertical';
+        if (event.cancelable) {
+          event.preventDefault();
+        }
+      } else if (absDeltaX > absDeltaY && absDeltaX >= 6) {
+        touchAxisLock = 'horizontal';
+      }
+    }
 
-    // Validación defensiva: Debe superar el umbral y manifestar intención horizontal dominante
-    if (absDeltaX < CONFIG.swipeThreshold || absDeltaX <= absDeltaY) {
+    // 2. Ejecución vertical: Bloqueo continuo del drag y disparo de snap temprano
+    if (touchAxisLock === 'vertical') {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      // Disparo temprano de snap a la sección contigua (18px)
+      if (!touchSnapTriggered && absDeltaY >= CONFIG.verticalSwipeThreshold && !isSnapScrolling) {
+        touchSnapTriggered = true;
+        const direction = deltaY < 0 ? 1 : -1;
+        snapToSection(direction);
+      }
+    }
+  };
+
+  /**
+   * Evalúa el desplazamiento del gesto táctil y aplica transición cartesiana si cumple los criterios.
+   * @param {TouchEvent} event - Evento táctil de finalización.
+   * @returns {void}
+   */
+  const handleTouchEnd = (event) => {
+    const coords = touchStartCoords;
+    const axisLock = touchAxisLock;
+    const snapTriggered = touchSnapTriggered;
+
+    // Reseteo de flags del toque al levantar el dedo
+    touchStartCoords = null;
+    touchAxisLock = null;
+    touchSnapTriggered = false;
+
+    if (!coords || !event.changedTouches || event.changedTouches.length === 0) {
       return;
     }
 
-    const targetElement = /** @type {HTMLElement} */ (event.target);
-    if (!targetElement) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - coords.x;
+    const deltaY = touch.clientY - coords.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
 
-    const rail = targetElement.closest('.rail-horizontal');
-    if (!rail) return;
+    // Caso 1: Gesto horizontal dominante (cambio de panel H0 <-> H1)
+    if (axisLock === 'horizontal' || (absDeltaX >= CONFIG.swipeThreshold && absDeltaX > absDeltaY)) {
+      const targetElement = /** @type {HTMLElement} */ (event.target);
+      if (!targetElement) return;
 
-    const currentPanel = rail.dataset.activePanel === '1' ? 1 : 0;
+      const rail = targetElement.closest('.rail-horizontal');
+      if (!rail) return;
 
-    if (deltaX < 0 && currentPanel === 0) {
-      // Desplazamiento hacia la izquierda -> avanzar al panel derecho (H1)
-      setHorizontalPanel(/** @type {HTMLElement} */ (rail), 1, false);
-    } else if (deltaX > 0 && currentPanel === 1) {
-      // Desplazamiento hacia la derecha -> regresar al panel izquierdo (H0)
-      setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, false);
+      const currentPanel = rail.dataset.activePanel === '1' ? 1 : 0;
+
+      if (deltaX < 0 && currentPanel === 0) {
+        // Desplazamiento hacia la izquierda -> avanzar al panel derecho (H1)
+        setHorizontalPanel(/** @type {HTMLElement} */ (rail), 1, false);
+      } else if (deltaX > 0 && currentPanel === 1) {
+        // Desplazamiento hacia la derecha -> regresar al panel izquierdo (H0)
+        setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, false);
+      }
+      return;
+    }
+
+    // Caso 2: Gesto vertical rápido (flick) que no alcanzó a dispararse en touchmove
+    if (!snapTriggered && (axisLock === 'vertical' || absDeltaY > absDeltaX) && absDeltaY >= CONFIG.verticalSwipeThreshold && !isSnapScrolling) {
+      snapToSection(deltaY < 0 ? 1 : -1);
     }
   };
 
@@ -265,7 +391,7 @@ export const Navigation = (() => {
       }
 
       const motionWrappers = section.querySelectorAll('.panel-v-motion');
-      const transformStr = `translate3d(0, ${yOffset.toFixed(1)}px, 0)`;
+      const transformStr = `translate3d(0, ${Math.round(yOffset)}px, 0)`;
       const opacityStr = opacity.toFixed(2);
 
       motionWrappers.forEach((wrapper) => {
@@ -396,8 +522,9 @@ export const Navigation = (() => {
     // 1. Delegación de clics en botones de cambio horizontal
     viewportTrack.addEventListener('click', handleButtonClick);
 
-    // 2. Detección de gestos táctiles horizontales (Mobile Swipe)
+    // 2. Detección de gestos táctiles (Mobile Swipe Horizontal + Snap Vertical Obligatorio)
     viewportTrack.addEventListener('touchstart', handleTouchStart, { passive: true });
+    viewportTrack.addEventListener('touchmove', handleTouchMove, { passive: false });
     viewportTrack.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     // 3. Configuración del IntersectionObserver (Anticubo de Rubik y Sync de Navegación)
@@ -441,6 +568,7 @@ export const Navigation = (() => {
       viewportTrack.removeEventListener('scroll', handleVerticalScroll);
       viewportTrack.removeEventListener('click', handleButtonClick);
       viewportTrack.removeEventListener('touchstart', handleTouchStart);
+      viewportTrack.removeEventListener('touchmove', handleTouchMove);
       viewportTrack.removeEventListener('touchend', handleTouchEnd);
     }
   };
