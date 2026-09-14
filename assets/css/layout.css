@@ -1,0 +1,417 @@
+/**
+ * ==============================================================================
+ * Roller Today - Layout Stylesheet
+ * File: assets/css/layout.css
+ * Description: Sistema de snap vertical, rieles horizontales por GPU,
+ * paneles cartesianos 100dvw x 100dvh y barra de navegación responsive (Desktop/Mobile).
+ * ==============================================================================
+ */
+
+/* -------------------------------------------------------------------------- */
+/* 1. Viewport Track (Eje Vertical - Scroll-Snap Nativo)                      */
+/* -------------------------------------------------------------------------- */
+.viewport-track {
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  width: 100dvw;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+/* Ocultar barra de desplazamiento manteniendo funcionalidad nativa */
+.viewport-track::-webkit-scrollbar {
+  display: none;
+}
+.viewport-track {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 2. Sección Vertical (.section-v)                                           */
+/* -------------------------------------------------------------------------- */
+.section-v {
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  width: 100dvw;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow: hidden;
+  position: relative;
+  contain: layout size;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 3. Riel Horizontal (.rail-horizontal - GPU Translate3d)                   */
+/* -------------------------------------------------------------------------- */
+.rail-horizontal {
+  display: flex;
+  flex-direction: row;
+  width: 200vw;
+  width: 200dvw;
+  height: 100%;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  transition: transform var(--duration-slide) var(--ease-out-expo);
+}
+
+/* Estado activo: Desplazamiento a panel secundario (Derecho) */
+.rail-horizontal.is-active-right,
+.rail-horizontal[data-active-panel="1"] {
+  transform: translate3d(-100vw, 0, 0);
+  transform: translate3d(-100dvw, 0, 0);
+}
+
+/* Reseteo instantáneo sin transición (Regla Anticubo de Rubik) */
+.rail-horizontal.no-transition {
+  transition: none !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 4. Paneles Cartesianos (.panel-h)                                          */
+/* -------------------------------------------------------------------------- */
+.panel-h {
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  padding: clamp(1.5rem, 5vw, 4rem);
+  box-sizing: border-box;
+}
+
+/* Contenedor central del contenido en el panel */
+.panel-content {
+  max-width: 680px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  z-index: 2;
+}
+
+.panel-tag {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+
+.panel-title {
+  font-size: var(--font-size-xl);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.panel-desc {
+  font-size: var(--font-size-md);
+  line-height: 1.6;
+  opacity: 0.9;
+  max-width: 520px;
+}
+
+/* Botones de navegación horizontal */
+.btn-nav-h {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  padding: 0.75rem 1.4rem;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  transition: background-color var(--duration-fade) ease,
+    transform var(--duration-fade) var(--ease-out-expo);
+  cursor: pointer;
+}
+
+.btn-nav-h:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-nav-h:active {
+  transform: translateY(0);
+}
+
+/* Indicador de posición de panel (Puntos H0 / H1) */
+.panel-indicator {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: var(--space-xs);
+}
+
+.indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0.35;
+  transition: opacity var(--duration-fade) ease, transform var(--duration-fade) ease;
+}
+
+.indicator-dot.active {
+  opacity: 1;
+  transform: scale(1.25);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 5. Asignación de Paleta por Sección y Panel                                */
+/* -------------------------------------------------------------------------- */
+/* 01. Onboarding */
+[data-section="onboarding"] [data-panel="left"] {
+  background-color: var(--color-s1-left-bg);
+  color: var(--color-s1-left-text);
+}
+[data-section="onboarding"] [data-panel="right"] {
+  background-color: var(--color-s1-right-bg);
+  color: var(--color-s1-right-text);
+}
+
+/* 02. Manifesto */
+[data-section="manifesto"] [data-panel="left"] {
+  background-color: var(--color-s2-left-bg);
+  color: var(--color-s2-left-text);
+}
+[data-section="manifesto"] [data-panel="right"] {
+  background-color: var(--color-s2-right-bg);
+  color: var(--color-s2-right-text);
+}
+
+/* 03. Gear & Merch */
+[data-section="gear"] [data-panel="left"] {
+  background-color: var(--color-s3-left-bg);
+  color: var(--color-s3-left-text);
+}
+[data-section="gear"] [data-panel="right"] {
+  background-color: var(--color-s3-right-bg);
+  color: var(--color-s3-right-text);
+}
+
+/* 04. Academia */
+[data-section="academy"] [data-panel="left"] {
+  background-color: var(--color-s4-left-bg);
+  color: var(--color-s4-left-text);
+}
+[data-section="academy"] [data-panel="right"] {
+  background-color: var(--color-s4-right-bg);
+  color: var(--color-s4-right-text);
+}
+
+/* 05. Rutas */
+[data-section="routes"] [data-panel="left"] {
+  background-color: var(--color-s5-left-bg);
+  color: var(--color-s5-left-text);
+}
+[data-section="routes"] [data-panel="right"] {
+  background-color: var(--color-s5-right-bg);
+  color: var(--color-s5-right-text);
+}
+
+/* 06. Base Camp */
+[data-section="basecamp"] [data-panel="left"] {
+  background-color: var(--color-s6-left-bg);
+  color: var(--color-s6-left-text);
+}
+[data-section="basecamp"] [data-panel="right"] {
+  background-color: var(--color-s6-right-bg);
+  color: var(--color-s6-right-text);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 6. Barra de Navegación (.app-nav) - Adaptabilidad Desktop vs Mobile        */
+/* -------------------------------------------------------------------------- */
+.app-nav {
+  position: fixed;
+  z-index: var(--nav-z-index);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: transform var(--duration-fade) ease;
+}
+
+.brand-logo {
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  font-size: var(--font-size-md);
+  text-transform: uppercase;
+  color: var(--color-text-on-dark);
+}
+
+/* Lista de navegación */
+.nav-list {
+  display: flex;
+  list-style: none;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 6px;
+  color: var(--color-text-muted-dark);
+  transition: color var(--duration-fade) ease, background-color var(--duration-fade) ease;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible,
+.nav-link.is-active {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 7. Media Queries: Mobile-First (< 768px vs >= 769px)                       */
+/* -------------------------------------------------------------------------- */
+
+/* Desktop Layout (> 768px) */
+@media (min-width: 769px) {
+  .app-nav {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--nav-height-desktop);
+    padding: 0 var(--space-lg);
+    background-color: rgba(10, 12, 16, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-border-dark);
+  }
+
+  .nav-toggle {
+    display: none !important;
+  }
+}
+
+/* Mobile Layout (<= 768px) */
+@media (max-width: 768px) {
+  .app-nav {
+    bottom: 0;
+    top: auto;
+    left: 0;
+    width: 100%;
+    height: auto;
+    padding: 0.75rem var(--space-md);
+    pointer-events: none; /* Permite clicks a través de la zona no ocupada */
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  /* Ocultar el logo de texto en el dock móvil inferior */
+  .brand-logo {
+    display: none;
+  }
+
+  /* Botón visible de despliegue para el pulgar */
+  .nav-toggle {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background-color: #0f172a;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5),
+      0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: transform var(--duration-fade) var(--ease-out-expo),
+      background-color var(--duration-fade) ease;
+  }
+
+  .nav-toggle:active {
+    transform: scale(0.92);
+  }
+
+  .nav-toggle[aria-expanded="true"] {
+    background-color: #e11d48;
+    transform: rotate(90deg);
+  }
+
+  /* Menú desplegable móvil: Solo íconos, oculto por defecto */
+  .nav-list {
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px) scale(0.95);
+    transition: opacity var(--duration-fade) ease,
+      transform var(--duration-fade) var(--ease-out-expo),
+      visibility var(--duration-fade);
+    display: flex;
+    flex-direction: row;
+    gap: 0.35rem;
+    padding: 0.5rem 0.75rem;
+    background-color: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 9999px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Estado abierto del menú móvil */
+  .nav-list.is-open {
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+
+  .nav-link {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    color: #e2e8f0;
+  }
+
+  .nav-link:hover,
+  .nav-link:active {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+  }
+
+  /* En móvil, ocultar la etiqueta de texto y mostrar únicamente el ícono */
+  .nav-text {
+    display: none;
+  }
+}

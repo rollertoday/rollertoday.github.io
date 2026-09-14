@@ -1,0 +1,336 @@
+/**
+ * @file navigation.js
+ * @module Navigation
+ * @description Controlador cartesiano de navegación 2D para Roller Today.
+ * Administra el desplazamiento horizontal por GPU, gestos táctiles móviles,
+ * reseteo silencioso con IntersectionObserver (Anticubo de Rubik) y el menú móvil táctil.
+ * Cumple con los estándares de JSDoc y encapsulación IIFE nativa.
+ */
+
+/**
+ * @typedef {Object} TouchCoordinates
+ * @property {number} x - Coordenada horizontal en píxeles.
+ * @property {number} y - Coordenada vertical en píxeles.
+ * @property {number} time - Marca de tiempo en milisegundos.
+ */
+
+/**
+ * @typedef {Object} NavigationConfig
+ * @property {number} swipeThreshold - Distancia mínima en píxeles para validar un swipe horizontal.
+ * @property {number} intersectionThreshold - Umbral de visibilidad para determinar sección activa.
+ */
+
+export const Navigation = (() => {
+  /**
+   * Configuración inmutable del controlador.
+   * @type {NavigationConfig}
+   */
+  const CONFIG = Object.freeze({
+    swipeThreshold: 40,
+    intersectionThreshold: 0.55
+  });
+
+  /**
+   * Referencia a coordenadas de inicio del gesto táctil.
+   * @type {TouchCoordinates | null}
+   */
+  let touchStartCoords = null;
+
+  /**
+   * Referencia al IntersectionObserver activo para reseteo y sincronización.
+   * @type {IntersectionObserver | null}
+   */
+  let sectionObserver = null;
+
+  /**
+   * Actualiza los puntos indicadores de posición (dots H0 / H1) dentro de una sección.
+   * @param {HTMLElement} sectionElement - Elemento contenedor de la sección vertical (.section-v).
+   * @param {number} activeIndex - Índice del panel activo (0 para izquierdo, 1 para derecho).
+   * @returns {void}
+   */
+  const updateIndicators = (sectionElement, activeIndex) => {
+    if (!sectionElement) return;
+
+    const indicators = sectionElement.querySelectorAll('.indicator-dot');
+    if (indicators.length === 0) return;
+
+    indicators.forEach((dot, index) => {
+      // Si el índice coincide con el panel activo o con el índice relativo del panel
+      const isActive = index % 2 === activeIndex;
+      dot.classList.toggle('active', isActive);
+    });
+  };
+
+  /**
+   * Mueve el riel horizontal a un panel específico (0: izquierdo, 1: derecho).
+   * @param {HTMLElement} railElement - Contenedor .rail-horizontal a desplazar.
+   * @param {number} panelIndex - Índice de destino (0 o 1).
+   * @param {boolean} [silent=false] - Si es verdadero, desactiva temporalmente las transiciones CSS.
+   * @returns {void}
+   */
+  const setHorizontalPanel = (railElement, panelIndex, silent = false) => {
+    if (!railElement) return;
+
+    const normalizedIndex = panelIndex === 1 ? 1 : 0;
+    const parentSection = railElement.closest('.section-v');
+
+    if (silent) {
+      railElement.classList.add('no-transition');
+    }
+
+    railElement.dataset.activePanel = String(normalizedIndex);
+    railElement.classList.toggle('is-active-right', normalizedIndex === 1);
+
+    if (parentSection) {
+      updateIndicators(parentSection, normalizedIndex);
+    }
+
+    if (silent) {
+      // Forzar reflow para asegurar aplicación síncrona sin interpolación visual
+      void railElement.offsetWidth;
+      railElement.classList.remove('no-transition');
+    }
+  };
+
+  /**
+   * Manejador delegado para los botones interactivos de cambio de panel horizontal.
+   * @param {MouseEvent} event - Evento del clic disparado en el árbol DOM.
+   * @returns {void}
+   */
+  const handleButtonClick = (event) => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    if (!target) return;
+
+    const nextBtn = target.closest('.btn-next-h');
+    const prevBtn = target.closest('.btn-prev-h');
+
+    if (!nextBtn && !prevBtn) return;
+
+    const rail = target.closest('.rail-horizontal');
+    if (!rail) return;
+
+    if (nextBtn) {
+      setHorizontalPanel(/** @type {HTMLElement} */ (rail), 1, false);
+    } else if (prevBtn) {
+      setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, false);
+    }
+  };
+
+  /**
+   * Registra el punto de contacto inicial para el reconocimiento de gestos táctiles.
+   * @param {TouchEvent} event - Evento táctil de inicio.
+   * @returns {void}
+   */
+  const handleTouchStart = (event) => {
+    if (!event.touches || event.touches.length !== 1) {
+      touchStartCoords = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+    touchStartCoords = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now()
+    };
+  };
+
+  /**
+   * Evalúa el desplazamiento del gesto táctil y aplica transición horizontal si cumple los criterios.
+   * @param {TouchEvent} event - Evento táctil de finalización.
+   * @returns {void}
+   */
+  const handleTouchEnd = (event) => {
+    if (!touchStartCoords || !event.changedTouches || event.changedTouches.length === 0) {
+      touchStartCoords = null;
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartCoords.x;
+    const deltaY = touch.clientY - touchStartCoords.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    // Limpieza de coordenadas registradas
+    touchStartCoords = null;
+
+    // Validación defensiva: Debe superar el umbral y manifestar intención horizontal dominante
+    if (absDeltaX < CONFIG.swipeThreshold || absDeltaX <= absDeltaY) {
+      return;
+    }
+
+    const targetElement = /** @type {HTMLElement} */ (event.target);
+    if (!targetElement) return;
+
+    const rail = targetElement.closest('.rail-horizontal');
+    if (!rail) return;
+
+    const currentPanel = rail.dataset.activePanel === '1' ? 1 : 0;
+
+    if (deltaX < 0 && currentPanel === 0) {
+      // Desplazamiento hacia la izquierda -> avanzar al panel derecho (H1)
+      setHorizontalPanel(/** @type {HTMLElement} */ (rail), 1, false);
+    } else if (deltaX > 0 && currentPanel === 1) {
+      // Desplazamiento hacia la derecha -> regresar al panel izquierdo (H0)
+      setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, false);
+    }
+  };
+
+  /**
+   * Resetea silenciosamente secciones fuera del viewport (Anticubo de Rubik)
+   * y sincroniza la sección activa en los enlaces de la barra de navegación.
+   * @param {IntersectionObserverEntry[]} entries - Entradas de intersección reportadas.
+   * @returns {void}
+   */
+  const handleIntersection = (entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) return;
+
+    entries.forEach((entry) => {
+      const section = /** @type {HTMLElement} */ (entry.target);
+      if (!section) return;
+
+      const rail = section.querySelector('.rail-horizontal');
+      const sectionId = section.getAttribute('id');
+
+      // Regla de Reseteo Automático: Cuando abandona completamente el viewport
+      if (!entry.isIntersecting && rail) {
+        const isRightPanel =
+          rail.getAttribute('data-active-panel') === '1' ||
+          rail.classList.contains('is-active-right');
+
+        if (isRightPanel) {
+          setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, true);
+        }
+      }
+
+      // Sincronización de enlace activo en la navegación
+      if (entry.isIntersecting && entry.intersectionRatio >= CONFIG.intersectionThreshold && sectionId) {
+        const navLinks = document.querySelectorAll('.app-nav .nav-link');
+        navLinks.forEach((link) => {
+          const href = link.getAttribute('href');
+          const isTarget = href === `#${sectionId}`;
+          link.classList.toggle('is-active', isTarget);
+        });
+      }
+    });
+  };
+
+  /**
+   * Inicializa los controles del menú desplegable inferior para dispositivos móviles.
+   * Mantiene los íconos ocultos por defecto y expone un botón para desplegar/cerrar.
+   * @returns {void}
+   */
+  const setupMobileMenu = () => {
+    const toggleBtn = document.getElementById('navToggleBtn');
+    const navList = document.getElementById('navList');
+
+    if (!toggleBtn || !navList) return;
+
+    /**
+     * Alterna la visibilidad del menú móvil.
+     * @param {boolean} [forceState] - Estado forzado opcional.
+     * @returns {void}
+     */
+    const toggleMenu = (forceState) => {
+      const isOpen =
+        typeof forceState === 'boolean'
+          ? forceState
+          : !navList.classList.contains('is-open');
+
+      navList.classList.toggle('is-open', isOpen);
+      toggleBtn.setAttribute('aria-expanded', String(isOpen));
+      toggleBtn.setAttribute(
+        'aria-label',
+        isOpen ? 'Cerrar menú de navegación' : 'Desplegar menú de navegación'
+      );
+    };
+
+    // Evento de clic en el botón expuesto
+    toggleBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleMenu();
+    });
+
+    // Cerrar menú al presionar un enlace
+    navList.addEventListener('click', (event) => {
+      const target = /** @type {HTMLElement} */ (event.target);
+      if (target && target.closest('.nav-link')) {
+        toggleMenu(false);
+      }
+    });
+
+    // Cerrar menú al hacer clic fuera
+    document.addEventListener('click', (event) => {
+      const target = /** @type {HTMLElement} */ (event.target);
+      if (!target) return;
+      if (!target.closest('.app-nav')) {
+        toggleMenu(false);
+      }
+    });
+
+    // Cerrar con la tecla Escape
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        toggleMenu(false);
+      }
+    });
+  };
+
+  /**
+   * Inicializa los escuchadores de eventos y observadores de intersección.
+   * @returns {void}
+   */
+  const init = () => {
+    const viewportTrack = document.getElementById('viewportTrack');
+    const sections = document.querySelectorAll('.section-v');
+
+    if (!viewportTrack || sections.length === 0) {
+      return;
+    }
+
+    // 1. Delegación de clics en botones de cambio horizontal
+    viewportTrack.addEventListener('click', handleButtonClick);
+
+    // 2. Detección de gestos táctiles horizontales (Mobile Swipe)
+    viewportTrack.addEventListener('touchstart', handleTouchStart, { passive: true });
+    viewportTrack.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    // 3. Configuración del IntersectionObserver (Anticubo de Rubik y Sync de Navegación)
+    const observerOptions = {
+      root: viewportTrack,
+      threshold: [0, CONFIG.intersectionThreshold]
+    };
+
+    sectionObserver = new IntersectionObserver(handleIntersection, observerOptions);
+    sections.forEach((section) => sectionObserver.observe(section));
+
+    // 4. Inicialización del menú táctil inferior en móvil
+    setupMobileMenu();
+  };
+
+  /**
+   * Destruye observadores y limpia referencias para evitar fugas de memoria si fuese necesario.
+   * @returns {void}
+   */
+  const destroy = () => {
+    if (sectionObserver) {
+      sectionObserver.disconnect();
+      sectionObserver = null;
+    }
+    const viewportTrack = document.getElementById('viewportTrack');
+    if (viewportTrack) {
+      viewportTrack.removeEventListener('click', handleButtonClick);
+      viewportTrack.removeEventListener('touchstart', handleTouchStart);
+      viewportTrack.removeEventListener('touchend', handleTouchEnd);
+    }
+  };
+
+  return Object.freeze({
+    init,
+    destroy,
+    setHorizontalPanel
+  });
+})();
+
+export default Navigation;
