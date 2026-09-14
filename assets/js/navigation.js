@@ -252,13 +252,32 @@ export const Navigation = (() => {
       toggleMenu();
     });
 
-    // Cerrar menú al presionar un enlace
-    navList.addEventListener('click', (event) => {
+    /**
+     * Manejador para la selección de enlaces en la navegación (Desktop y Móvil).
+     * Ejecuta scroll suave programático y remueve el foco para evitar halos congelados.
+     * @param {MouseEvent} event - Evento del clic.
+     * @returns {void}
+     */
+    const handleNavLinkClick = (event) => {
       const target = /** @type {HTMLElement} */ (event.target);
-      if (target && target.closest('.nav-link')) {
-        toggleMenu(false);
+      const link = target ? target.closest('.nav-link') : null;
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      if (!href || !href.startsWith('#')) return;
+
+      const targetSection = document.querySelector(href);
+      if (targetSection) {
+        event.preventDefault();
+        targetSection.scrollIntoView({ behavior: 'smooth' });
       }
-    });
+
+      // Desenfocar inmediatamente para limpiar pseudo-estados :focus/:active
+      link.blur();
+      toggleMenu(false);
+    };
+
+    navList.addEventListener('click', handleNavLinkClick);
 
     // Cerrar menú al hacer clic fuera
     document.addEventListener('click', (event) => {
@@ -266,6 +285,22 @@ export const Navigation = (() => {
       if (!target) return;
       if (!target.closest('.app-nav')) {
         toggleMenu(false);
+      }
+    });
+
+    // Desenfocar cualquier enlace si se suelta el puntero fuera tras un intento de arrastre
+    document.addEventListener('pointerup', () => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.classList.contains('nav-link') || activeEl.classList.contains('nav-toggle'))) {
+        /** @type {HTMLElement} */ (activeEl).blur();
+      }
+    });
+
+    // Prevenir el arrastre nativo (HTML5 Drag & Drop) que congela elementos de UI
+    document.addEventListener('dragstart', (event) => {
+      const target = /** @type {HTMLElement} */ (event.target);
+      if (target && (target.closest('.app-nav') || target.closest('.btn-nav-h'))) {
+        event.preventDefault();
       }
     });
 

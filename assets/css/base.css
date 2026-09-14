@@ -41,9 +41,9 @@
   --nav-z-index: 1000;
 
   /* Cinemática y Aceleración por GPU */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-slide: 450ms;
-  --duration-fade: 250ms;
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-slide: 850ms;
+  --duration-fade: 300ms;
 
   /* Colores Neutros y Estructurales */
   --color-dark-surface: #0a0c10;
