@@ -66,6 +66,8 @@
   will-change: transform;
   transform: translate3d(0, 0, 0);
   transition: transform var(--duration-slide) var(--ease-out-expo);
+  position: relative;
+  z-index: 5;
 }
 
 /* Estado activo: Desplazamiento a panel secundario (Derecho) */
@@ -101,19 +103,43 @@
   overflow: hidden;
 }
 
-/* Capa 1: Fondo Agnóstico (Parallax atenuado 0.3x - 0.5x para futuros activos) */
-.panel-bg {
+/* Capa 1: Fondo y Medios (Parallax 3D multicapa con bleed de seguridad) */
+.panel-bg,
+.panel-media-wrapper {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: -15% -10%;
+  width: 120%;
+  height: 130%;
   z-index: 1;
   pointer-events: none;
   background-size: cover;
   background-position: center;
+  overflow: hidden;
   will-change: transform;
   transform: translate3d(0, 0, 0) scale(1);
   transition: transform var(--duration-slide) var(--ease-out-expo);
+}
+
+/* Imagen de fondo con soporte de punto focal y escalado de seguridad */
+.panel-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--focal-point, center center);
+  will-change: transform;
+  transform: translate3d(0, 0, 0) scale(1.05);
+  transition: transform var(--duration-slide) var(--ease-out-expo);
+}
+
+/* Gradiente de contraste para legibilidad estricta WCAG AAA sobre fotografías */
+.panel-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--panel-gradient,
+      linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.7) 100%));
+  z-index: 2;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
 }
 
 /* Capa 2: Contenedor desacoplado para cinemática vertical (Eje Y) */
@@ -151,7 +177,8 @@
   pointer-events: auto;
 }
 
-.section-v[data-v-state="active"] .panel-bg {
+.section-v[data-v-state="active"] .panel-bg,
+.section-v[data-v-state="active"] .panel-media-wrapper {
   transform: translate3d(0, 0, 0) scale(1);
   opacity: 1;
 }
@@ -166,9 +193,10 @@
   pointer-events: none;
 }
 
-.section-v[data-v-state="prev"] .panel-bg {
-  transform: translate3d(0, -15vh, 0);
-  transform: translate3d(0, -15dvh, 0) scale(1.05);
+.section-v[data-v-state="prev"] .panel-bg,
+.section-v[data-v-state="prev"] .panel-media-wrapper {
+  transform: translate3d(0, -10vh, 0);
+  transform: translate3d(0, -10dvh, 0) scale(1.05);
   opacity: 0.7;
 }
 
@@ -182,9 +210,10 @@
   pointer-events: none;
 }
 
-.section-v[data-v-state="next"] .panel-bg {
-  transform: translate3d(0, 15vh, 0);
-  transform: translate3d(0, 15dvh, 0) scale(1.05);
+.section-v[data-v-state="next"] .panel-bg,
+.section-v[data-v-state="next"] .panel-media-wrapper {
+  transform: translate3d(0, 10vh, 0);
+  transform: translate3d(0, 10dvh, 0) scale(1.05);
   opacity: 0.7;
 }
 
@@ -210,13 +239,15 @@
 
 /* Estado por defecto: Panel izquierdo activo (data-active-panel="0") */
 .rail-horizontal[data-active-panel="0"] [data-panel="left"] .panel-content {
-  transform: translate3d(0, 0, 0);
+  transform: translate3d(calc(var(--parallax-x, 0) * -10px),
+      calc(var(--parallax-y, 0) * -10px),
+      0);
   opacity: 1;
   pointer-events: auto;
 }
 
 .rail-horizontal[data-active-panel="0"] [data-panel="right"] .panel-content {
-  /* Preparado a la izquierda del marco para entrar lento de izquierda a derecha */
+  /* Preparado a la izquierda del marco para entrar de izquierda a derecha */
   transform: translate3d(-120vw, 0, 0);
   opacity: 0;
   pointer-events: none;
@@ -233,10 +264,40 @@
 
 .rail-horizontal.is-active-right [data-panel="right"] .panel-content,
 .rail-horizontal[data-active-panel="1"] [data-panel="right"] .panel-content {
-  /* Centrado en viewport */
-  transform: translate3d(0, 0, 0);
+  /* Centrado en viewport con desplazamiento reactivo de puntero */
+  transform: translate3d(calc(var(--parallax-x, 0) * -10px),
+      calc(var(--parallax-y, 0) * -10px),
+      0);
   opacity: 1;
   pointer-events: auto;
+}
+
+/* ========================================================================== */
+/* Parallax Horizontal de Fondos en Transición de Riel (.panel-media)         */
+/* ========================================================================== */
+
+/* Estado por defecto: Panel izquierdo activo (data-active-panel="0") */
+.rail-horizontal[data-active-panel="0"] [data-panel="left"] .panel-media {
+  transform: translate3d(calc(var(--parallax-x, 0) * 20px),
+      calc(var(--parallax-y, 0) * 20px),
+      0) scale(1.05);
+}
+
+.rail-horizontal[data-active-panel="0"] [data-panel="right"] .panel-media {
+  transform: translate3d(-15vw, 0, 0) scale(1.05);
+}
+
+/* Estado secundario: Panel derecho activo (data-active-panel="1" o .is-active-right) */
+.rail-horizontal.is-active-right [data-panel="left"] .panel-media,
+.rail-horizontal[data-active-panel="1"] [data-panel="left"] .panel-media {
+  transform: translate3d(15vw, 0, 0) scale(1.05);
+}
+
+.rail-horizontal.is-active-right [data-panel="right"] .panel-media,
+.rail-horizontal[data-active-panel="1"] [data-panel="right"] .panel-media {
+  transform: translate3d(calc(var(--parallax-x, 0) * 20px),
+      calc(var(--parallax-y, 0) * 20px),
+      0) scale(1.05);
 }
 
 .panel-tag {
@@ -248,6 +309,9 @@
   border-radius: 9999px;
   border: 1px solid currentColor;
   opacity: 0.85;
+  color: white;
+  /* El blanco genera el contraste invertido perfecto */
+  mix-blend-mode: difference;
 }
 
 .panel-title {
@@ -255,6 +319,9 @@
   line-height: 1.15;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: white;
+  /* El blanco genera el contraste invertido perfecto */
+  mix-blend-mode: difference;
 }
 
 .panel-desc {
@@ -262,6 +329,11 @@
   line-height: 1.6;
   opacity: 0.9;
   max-width: 520px;
+  color: white;
+  /* El blanco genera el contraste invertido perfecto */
+  mix-blend-mode: difference;
+  font-weight: bold;
+  font-size: 120%;
 }
 
 /* Botones de navegación horizontal */
@@ -371,15 +443,61 @@
   color: var(--color-s5-right-text);
 }
 
-/* 06. Base Camp */
-[data-section="basecamp"] [data-panel="left"] {
-  background-color: var(--color-s6-left-bg);
-  color: var(--color-s6-left-text);
+/* 06. Base Camp - Fondo Panorámico Único y Dinámico */
+[data-section="basecamp"] {
+  background-color: #000000;
+  position: relative;
+  overflow: hidden;
 }
 
+#basecamp .rail-horizontal {
+  position: relative;
+  z-index: 10;
+}
+
+[data-section="basecamp"] [data-panel="left"],
 [data-section="basecamp"] [data-panel="right"] {
-  background-color: var(--color-s6-right-bg);
-  color: var(--color-s6-right-text);
+  background-color: transparent !important;
+  color: var(--color-brand-white, #ffffff);
+}
+
+/* Fondo panorámico único para Sección 6 */
+#basecamp .basecamp-media-wrapper {
+  position: absolute;
+  inset: -15% -10%;
+  width: 120%;
+  height: 130%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  transition: transform var(--duration-slide) var(--ease-out-expo);
+}
+
+#basecamp .basecamp-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  will-change: object-position, transform;
+  transition: object-position var(--duration-slide) var(--ease-out-expo),
+    transform var(--duration-slide) var(--ease-out-expo);
+}
+
+/* Panel Izquierdo (Default): Prioriza el lado izquierdo del logo (el ícono del patinador) */
+#basecamp .basecamp-media {
+  object-position: 20% center;
+  transform: scale(1.1);
+}
+
+/* Panel Derecho: Prioriza el lado derecho del logo (las letras 'Roller Today') */
+#basecamp .rail-horizontal[data-active-panel="1"] ~ .basecamp-media-wrapper .basecamp-media,
+#basecamp .rail-horizontal.is-active-right ~ .basecamp-media-wrapper .basecamp-media,
+#basecamp:has(.rail-horizontal[data-active-panel="1"]) .basecamp-media,
+#basecamp:has(.rail-horizontal.is-active-right) .basecamp-media,
+#basecamp[data-active-h-panel="1"] .basecamp-media {
+  object-position: 80% center;
+  transform: scale(1.1);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -399,7 +517,7 @@
   letter-spacing: 0.12em;
   font-size: var(--font-size-md);
   text-transform: uppercase;
-  color: var(--color-text-on-dark);
+  color: #ffffff;
 }
 
 /* Lista de navegación */
@@ -422,7 +540,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-radius: 6px;
-  color: var(--color-text-muted-dark);
+  color: #ffffff;
   -webkit-user-select: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -433,19 +551,19 @@
 @media (hover: hover) and (pointer: fine) {
   .nav-link:hover {
     color: #ffffff;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.25);
   }
 }
 
 .nav-link:focus-visible {
   color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.1);
-  outline: 2px solid currentColor;
+  background-color: rgba(255, 255, 255, 0.25);
+  outline: 2px solid #ffffff;
 }
 
 .nav-link.is-active {
   color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.18);
+  background-color: rgba(255, 255, 255, 0.35);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -460,10 +578,9 @@
     width: 100%;
     height: var(--nav-height-desktop);
     padding: 0 var(--space-lg);
-    background-color: rgba(10, 12, 16, 0.82);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--color-border-dark);
+    background-color: var(--color-brand-orange, #F37324);
+    box-shadow: 0 4px 20px rgba(243, 115, 36, 0.35);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
   }
 
   .nav-toggle {
@@ -493,7 +610,7 @@
     display: none;
   }
 
-  /* Botón visible de despliegue para el pulgar */
+  /* Botón visible de despliegue para el pulgar con color anaranjado de marca */
   .nav-toggle {
     pointer-events: auto;
     display: inline-flex;
@@ -503,10 +620,10 @@
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background-color: #0f172a;
+    background-color: var(--color-brand-orange, #F37324);
     color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5),
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 10px 25px -5px rgba(243, 115, 36, 0.55),
       0 8px 10px -6px rgba(0, 0, 0, 0.5);
     font-size: 1.25rem;
     cursor: pointer;
@@ -523,11 +640,11 @@
   }
 
   .nav-toggle[aria-expanded="true"] {
-    background-color: #e11d48;
+    background-color: var(--color-brand-orange-dark, #d65910);
     transform: rotate(90deg);
   }
 
-  /* Menú desplegable móvil: Solo íconos, oculto por defecto */
+  /* Menú desplegable móvil: Solo íconos, fondo naranja con íconos blancos */
   .nav-list {
     pointer-events: none;
     opacity: 0;
@@ -540,12 +657,11 @@
     flex-direction: row;
     gap: 0.35rem;
     padding: 0.5rem 0.75rem;
-    background-color: rgba(15, 23, 42, 0.94);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: var(--color-brand-orange, #F37324);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 9999px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6),
+      0 10px 20px -5px rgba(243, 115, 36, 0.4);
     -webkit-user-select: none;
     user-select: none;
     -webkit-user-drag: none;
@@ -569,7 +685,7 @@
     justify-content: center;
     border-radius: 50%;
     font-size: 1.1rem;
-    color: #e2e8f0;
+    color: #ffffff;
     -webkit-user-select: none;
     user-select: none;
     -webkit-user-drag: none;

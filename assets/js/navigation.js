@@ -97,6 +97,7 @@ export const Navigation = (() => {
     railElement.classList.toggle("is-active-right", normalizedIndex === 1);
 
     if (parentSection) {
+      parentSection.dataset.activeHPanel = String(normalizedIndex);
       updateIndicators(parentSection, normalizedIndex);
     }
 
@@ -178,6 +179,16 @@ export const Navigation = (() => {
           setHorizontalPanel(/** @type {HTMLElement} */ (prevRail), 0, true);
         }
       }
+
+      // Resetear variables CSS de parallax reactivo por puntero
+      /** @type {HTMLElement} */ (sections[prevIndex]).style.setProperty(
+        "--parallax-x",
+        "0",
+      );
+      /** @type {HTMLElement} */ (sections[prevIndex]).style.setProperty(
+        "--parallax-y",
+        "0",
+      );
     }
 
     // 5. Sincronizar enlace activo en la barra de navegación superior/móvil
@@ -509,6 +520,96 @@ export const Navigation = (() => {
   };
 
   /**
+   * Identificador del frame de animación para el parallax reactivo por cursor.
+   * @type {number | null}
+   */
+  let mouseParallaxRafId = null;
+
+  /**
+   * Coordenadas almacenadas del cursor para el procesamiento desacoplado en rAF.
+   * @type {{ x: number, y: number }}
+   */
+  const mousePosition = { x: 0, y: 0 };
+
+  /**
+   * Manejador de movimiento del cursor para parallax reactivo de escritorio.
+   * @type {((event: MouseEvent) => void) | null}
+   */
+  let handleMouseMove = null;
+
+  /**
+   * Manejador de salida del cursor para resetear variables de parallax.
+   * @type {(() => void) | null}
+   */
+  let handleMouseLeave = null;
+
+  /**
+   * Inicializa el efecto de profundidad y parallax reactivo por puntero fino en pantallas desktop.
+   * Utiliza requestAnimationFrame para desacoplar el cálculo del ciclo de eventos del DOM y garantizar 60fps.
+   * @returns {void}
+   */
+  const setupMouseParallax = () => {
+    // Validar capacidad de puntero fino (Desktop / Mouse)
+    const isFinePointer = window.matchMedia(
+      "(hover: hover) and (pointer: fine)",
+    ).matches;
+    if (!isFinePointer) return;
+
+    /**
+     * Procesa la actualización de custom properties (--parallax-x, --parallax-y)
+     * de forma sincronizada con el refresco de pantalla del navegador.
+     * @returns {void}
+     */
+    const updateParallax = () => {
+      mouseParallaxRafId = null;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      if (width === 0 || height === 0) return;
+
+      // Normalizar coordenadas en rango [-1, 1] respecto al centro del viewport
+      const normX = (mousePosition.x / width - 0.5) * 2;
+      const normY = (mousePosition.y / height - 0.5) * 2;
+
+      const sections = document.querySelectorAll(".section-v");
+      const activeSection = /** @type {HTMLElement | undefined} */ (
+        sections[activeVerticalIndex]
+      );
+      if (activeSection) {
+        activeSection.style.setProperty("--parallax-x", normX.toFixed(3));
+        activeSection.style.setProperty("--parallax-y", normY.toFixed(3));
+      }
+    };
+
+    handleMouseMove = (event) => {
+      mousePosition.x = event.clientX;
+      mousePosition.y = event.clientY;
+
+      if (mouseParallaxRafId === null) {
+        mouseParallaxRafId = requestAnimationFrame(updateParallax);
+      }
+    };
+
+    handleMouseLeave = () => {
+      if (mouseParallaxRafId !== null) {
+        cancelAnimationFrame(mouseParallaxRafId);
+        mouseParallaxRafId = null;
+      }
+      const sections = document.querySelectorAll(".section-v");
+      const activeSection = /** @type {HTMLElement | undefined} */ (
+        sections[activeVerticalIndex]
+      );
+      if (activeSection) {
+        activeSection.style.setProperty("--parallax-x", "0");
+        activeSection.style.setProperty("--parallax-y", "0");
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    document.addEventListener("mouseleave", handleMouseLeave);
+  };
+
+  /**
    * Inicializa el controlador cartesiano, vincula los escuchadores de eventos
    * y posiciona el estado inicial de la matriz 2D.
    * @returns {void}
@@ -546,7 +647,10 @@ export const Navigation = (() => {
     // 5. Menú táctil inferior y enlaces de barra de navegación
     setupMobileMenu();
 
-    // 6. Aplicar posición inicial silenciosamente (Sección 0, Panel Izquierdo)
+    // 6. Parallax reactivo por cursor para pantallas con puntero fino (Desktop)
+    // setupMouseParallax();
+
+    // 7. Aplicar posición inicial silenciosamente (Sección 0, Panel Izquierdo)
     setVerticalSection(0, true);
   };
 
@@ -557,6 +661,17 @@ export const Navigation = (() => {
   const destroy = () => {
     window.removeEventListener("wheel", handleWheel);
     window.removeEventListener("keydown", handleKeyDown);
+
+    if (handleMouseMove) {
+      window.removeEventListener("mousemove", handleMouseMove);
+    }
+    if (handleMouseLeave) {
+      document.removeEventListener("mouseleave", handleMouseLeave);
+    }
+    if (mouseParallaxRafId !== null) {
+      cancelAnimationFrame(mouseParallaxRafId);
+      mouseParallaxRafId = null;
+    }
 
     const viewportTrack = document.getElementById("viewportTrack");
     if (viewportTrack) {

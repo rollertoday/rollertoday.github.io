@@ -45,6 +45,11 @@
   --duration-slide: 700ms;
   --duration-fade: 250ms;
 
+  /* Colores de Marca Oficial */
+  --color-brand-orange: #F37324;
+  --color-brand-orange-dark: #d65910;
+  --color-brand-white: #ffffff;
+
   /* Colores Neutros y Estructurales */
   --color-dark-surface: #0a0c10;
   --color-light-surface: #f8fafc;
@@ -59,39 +64,39 @@
   /* Paleta de Baja Fidelidad por Secciones (Pares Izquierda / Derecha)       */
   /* ------------------------------------------------------------------------ */
   /* 01. Onboarding: Patinaje Nocturno (Izquierda) / Patinaje Diurno (Derecha) */
-  --color-s1-left-bg: #090d16;
-  --color-s1-left-text: #e2e8f0;
-  --color-s1-right-bg: #f59e0b;
-  --color-s1-right-text: #1a1003;
+  --color-s1-left-bg: #000;
+  --color-s1-left-text: #ffffff;
+  --color-s1-right-bg: #000;
+  --color-s1-right-text: #ffffff;
 
   /* 02. Manifesto: Historia de Marca (Izquierda) / Cultura & Filosofía (Derecha) */
-  --color-s2-left-bg: #18191f;
-  --color-s2-left-text: #f8fafc;
-  --color-s2-right-bg: #e11d48;
+  --color-s2-left-bg: #000;
+  --color-s2-left-text: #ffffff;
+  --color-s2-right-bg: #000;
   --color-s2-right-text: #ffffff;
 
   /* 03. Gear & Merch: Equipo Técnico (Izquierda) / Streetwear Oficial (Derecha) */
-  --color-s3-left-bg: #0f172a;
-  --color-s3-left-text: #f1f5f9;
-  --color-s3-right-bg: #06b6d4;
-  --color-s3-right-text: #042f2e;
+  --color-s3-left-bg: #000;
+  --color-s3-left-text: #ffffff;
+  --color-s3-right-bg: #000;
+  --color-s3-right-text: #ffffff;
 
   /* 04. Academia: Clases Grupales (Izquierda) / Entrenamiento Personalizado (Derecha) */
-  --color-s4-left-bg: #064e3b;
-  --color-s4-left-text: #ecfdf5;
-  --color-s4-right-bg: #10b981;
-  --color-s4-right-text: #022c22;
+  --color-s4-left-bg: #000;
+  --color-s4-left-text: #ffffff;
+  --color-s4-right-bg: #000;
+  --color-s4-right-text: #ffffff;
 
   /* 05. Rutas: Rodadas Domingo (Izquierda) / Ruta Urbana Nocturna Jueves (Derecha) */
-  --color-s5-left-bg: #2e1065;
-  --color-s5-left-text: #faf5ff;
-  --color-s5-right-bg: #db2777;
+  --color-s5-left-bg: #000;
+  --color-s5-left-text: #ffffff;
+  --color-s5-right-bg: #000;
   --color-s5-right-text: #ffffff;
 
   /* 06. Base Camp: Comunidad WhatsApp/TG (Izquierda) / Soporte & Redes (Derecha) */
-  --color-s6-left-bg: #111827;
-  --color-s6-left-text: #f9fafb;
-  --color-s6-right-bg: #6366f1;
+  --color-s6-left-bg: #000;
+  --color-s6-left-text: #ffffff;
+  --color-s6-right-bg: #000;
   --color-s6-right-text: #ffffff;
 }
 
@@ -104,6 +109,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  user-select: none;
 }
 
 html {
@@ -114,7 +120,8 @@ html {
   line-height: 1.5;
   color: var(--color-text-on-dark);
   background-color: var(--color-dark-surface);
-  overflow: hidden; /* El scroll está delegado exclusivamente a .viewport-track */
+  overflow: hidden;
+  /* El scroll está delegado exclusivamente a .viewport-track */
   height: 100%;
   width: 100%;
 }
