@@ -104,14 +104,10 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  will-change: transform;
   pointer-events: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
 }
 
 .panel-v-motion > .panel-content {
@@ -127,14 +123,11 @@
   align-items: center;
   gap: var(--space-md);
   z-index: 2;
-  will-change: transform, opacity;
   transition: transform var(--duration-slide) var(--ease-out-expo),
     opacity calc(var(--duration-slide) * 0.75) ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
+  text-rendering: optimizeLegibility;
 }
 
 /* ========================================================================== */
