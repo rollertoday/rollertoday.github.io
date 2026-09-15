@@ -2,8 +2,10 @@
  * @file navigation.js
  * @module Navigation
  * @description Controlador cartesiano de navegación 2D para Roller Today.
- * Administra el desplazamiento horizontal por GPU, gestos táctiles móviles,
- * reseteo silencioso con IntersectionObserver (Anticubo de Rubik) y el menú móvil táctil.
+ * Administra el desplazamiento vertical y horizontal mediante rieles acelerados por GPU,
+ * gestos táctiles fluidos, eventos de rueda de ratón con candado cinemático, navegación
+ * por teclado, reseteo de paneles (Anticubo de Rubik) y menú móvil táctil.
+ * Opera 100% sobre CSS Transitions del Compositor thread para erradicar el blur en móviles.
  * Cumple con los estándares de JSDoc y encapsulación IIFE nativa.
  */
 
@@ -17,7 +19,8 @@
 /**
  * @typedef {Object} NavigationConfig
  * @property {number} swipeThreshold - Distancia mínima en píxeles para validar un swipe horizontal.
- * @property {number} intersectionThreshold - Umbral de visibilidad para determinar sección activa.
+ * @property {number} verticalSwipeThreshold - Distancia mínima en píxeles para validar un swipe vertical.
+ * @property {number} transitionDurationMs - Duración del bloqueo cinemático durante la transición.
  */
 
 export const Navigation = (() => {
@@ -28,8 +31,20 @@ export const Navigation = (() => {
   const CONFIG = Object.freeze({
     swipeThreshold: 40,
     verticalSwipeThreshold: 40,
-    intersectionThreshold: 0.55,
+    transitionDurationMs: 800,
   });
+
+  /**
+   * Índice de la sección vertical actualmente activa (0 a 5).
+   * @type {number}
+   */
+  let activeVerticalIndex = 0;
+
+  /**
+   * Bandera para prevenir disparos múltiples mientras se anima el riel vertical.
+   * @type {boolean}
+   */
+  let isVerticalTransitioning = false;
 
   /**
    * Referencia a coordenadas de inicio del gesto táctil.
@@ -44,30 +59,6 @@ export const Navigation = (() => {
   let touchAxisLock = null;
 
   /**
-   * Indica si ya se ejecutó un snap vertical durante el toque activo.
-   * @type {boolean}
-   */
-  let touchSnapTriggered = false;
-
-  /**
-   * Referencia al IntersectionObserver activo para reseteo y sincronización.
-   * @type {IntersectionObserver | null}
-   */
-  let sectionObserver = null;
-
-  /**
-   * Referencia al requestAnimationFrame activo para el cálculo de parallax vertical.
-   * @type {number | null}
-   */
-  let verticalRafId = null;
-
-  /**
-   * Bandera para prevenir disparos múltiples mientras transiciona el snap vertical.
-   * @type {boolean}
-   */
-  let isSnapScrolling = false;
-
-  /**
    * Actualiza los puntos indicadores de posición (dots H0 / H1) dentro de una sección.
    * @param {HTMLElement} sectionElement - Elemento contenedor de la sección vertical (.section-v).
    * @param {number} activeIndex - Índice del panel activo (0 para izquierdo, 1 para derecho).
@@ -80,7 +71,6 @@ export const Navigation = (() => {
     if (indicators.length === 0) return;
 
     indicators.forEach((dot, index) => {
-      // Si el índice coincide con el panel activo o con el índice relativo del panel
       const isActive = index % 2 === activeIndex;
       dot.classList.toggle("active", isActive);
     });
@@ -111,9 +101,91 @@ export const Navigation = (() => {
     }
 
     if (silent) {
-      // Forzar reflow para asegurar aplicación síncrona sin interpolación visual
       void railElement.offsetWidth;
       railElement.classList.remove("no-transition");
+    }
+  };
+
+  /**
+   * Desplaza el riel vertical hacia la sección especificada con cinemática GPU pura.
+   * Actualiza la máquina de estados CSS (active, prev, next) para activar el counter-parallax
+   * de texto y el parallax suave de fondos de manera totalmente independiente del hilo JS.
+   * @param {number} targetIndex - Índice de la sección vertical de destino (0 a N-1).
+   * @param {boolean} [silent=false] - Si es verdadero, desactiva la animación de desplazamiento.
+   * @returns {void}
+   */
+  const setVerticalSection = (targetIndex, silent = false) => {
+    const railVertical = document.getElementById("railVertical");
+    const sections = document.querySelectorAll(".section-v");
+
+    if (!railVertical || sections.length === 0) return;
+
+    const clampedIndex = Math.max(0, Math.min(sections.length - 1, targetIndex));
+
+    if (clampedIndex === activeVerticalIndex && !silent) return;
+
+    const prevIndex = activeVerticalIndex;
+    activeVerticalIndex = clampedIndex;
+
+    // 1. Candado cinemático para evitar saltos en ráfaga
+    if (!silent) {
+      isVerticalTransitioning = true;
+      setTimeout(() => {
+        isVerticalTransitioning = false;
+      }, CONFIG.transitionDurationMs);
+    }
+
+    // 2. Aplicar transición instantánea o animada en el riel vertical
+    if (silent) {
+      railVertical.classList.add("no-transition");
+    }
+
+    railVertical.style.transform = `translate3d(0, -${clampedIndex * 100}%, 0)`;
+
+    if (silent) {
+      void railVertical.offsetWidth;
+      railVertical.classList.remove("no-transition");
+    }
+
+    // 3. Actualizar estados semánticos verticales para counter-parallax CSS
+    sections.forEach((section, index) => {
+      /** @type {HTMLElement} */ (section).classList.toggle(
+        "is-active",
+        index === clampedIndex,
+      );
+
+      if (index === clampedIndex) {
+        section.dataset.vState = "active";
+      } else if (index < clampedIndex) {
+        section.dataset.vState = "prev";
+      } else {
+        section.dataset.vState = "next";
+      }
+    });
+
+    // 4. Regla de Reseteo Automático (Anticubo de Rubik)
+    // Al abandonar una sección vertical, retornar su riel horizontal al panel H0 silenciosamente
+    if (prevIndex !== clampedIndex && sections[prevIndex]) {
+      const prevRail = sections[prevIndex].querySelector(".rail-horizontal");
+      if (prevRail) {
+        const isRightPanel =
+          prevRail.getAttribute("data-active-panel") === "1" ||
+          prevRail.classList.contains("is-active-right");
+        if (isRightPanel) {
+          setHorizontalPanel(/** @type {HTMLElement} */ (prevRail), 0, true);
+        }
+      }
+    }
+
+    // 5. Sincronizar enlace activo en la barra de navegación superior/móvil
+    const targetSection = sections[clampedIndex];
+    if (targetSection) {
+      const sectionId = targetSection.getAttribute("id");
+      const navLinks = document.querySelectorAll(".app-nav .nav-link");
+      navLinks.forEach((link) => {
+        const href = link.getAttribute("href");
+        link.classList.toggle("is-active", href === `#${sectionId}`);
+      });
     }
   };
 
@@ -142,50 +214,23 @@ export const Navigation = (() => {
   };
 
   /**
-   * Ejecuta un snap obligatorio y fluido a la sección vertical contigua (Plan B).
-   * Impide el arrastre manual paulatino en pantallas táctiles y fuerza un snap limpio
-   * idéntico al comportamiento cinemático de escritorio.
-   * @param {number} direction - Dirección del salto (+1 para siguiente sección, -1 para anterior).
+   * Manejador de la rueda del ratón y touchpads con candado cinemático.
+   * Dispara una sección limpia por cada impulso sin arrastre paulatino ni blur.
+   * @param {WheelEvent} event - Evento de rueda de ratón.
    * @returns {void}
    */
-  const snapToSection = (direction) => {
-    const viewportTrack = document.getElementById("viewportTrack");
-    if (!viewportTrack) {
-      isSnapScrolling = false;
-      return;
-    }
+  const handleWheel = (event) => {
+    if (event.ctrlKey) return; // Permitir zoom del navegador si se solicita
 
-    const sections = viewportTrack.querySelectorAll(".section-v");
-    if (sections.length === 0) {
-      isSnapScrolling = false;
-      return;
-    }
+    event.preventDefault();
 
-    const trackHeight = viewportTrack.clientHeight || window.innerHeight;
-    const currentIndex = Math.round(viewportTrack.scrollTop / trackHeight);
-    const targetIndex = Math.max(
-      0,
-      Math.min(sections.length - 1, currentIndex + direction),
-    );
+    if (isVerticalTransitioning) return;
 
-    if (targetIndex !== currentIndex) {
-      const targetSection = sections[targetIndex];
-      if (targetSection && typeof targetSection.scrollIntoView === "function") {
-        targetSection.scrollIntoView({ behavior: "smooth" });
-      } else {
-        viewportTrack.scrollTo({
-          top: targetIndex * trackHeight,
-          behavior: "smooth",
-        });
-      }
-      setTimeout(() => {
-        isSnapScrolling = false;
-      }, 650);
-    } else {
-      setTimeout(() => {
-        isSnapScrolling = false;
-      }, 200);
-    }
+    // Filtrar micro-ruido de aceleración en trackpads
+    if (Math.abs(event.deltaY) < 16) return;
+
+    const direction = event.deltaY > 0 ? 1 : -1;
+    setVerticalSection(activeVerticalIndex + direction);
   };
 
   /**
@@ -197,7 +242,6 @@ export const Navigation = (() => {
     if (!event.touches || event.touches.length !== 1) {
       touchStartCoords = null;
       touchAxisLock = null;
-      touchSnapTriggered = false;
       return;
     }
 
@@ -208,28 +252,20 @@ export const Navigation = (() => {
       time: Date.now(),
     };
     touchAxisLock = null;
-    touchSnapTriggered = false;
   };
 
   /**
-   * Manejador del movimiento táctil.
-   * Detecta tempranamente la intención vertical (desde 4px) y cancela el arrastre
-   * manual paulatino de forma ininterrumpida durante toda la pulsación (Plan B).
+   * Manejador de movimiento táctil. Bloquea el rebote del navegador
+   * y detecta tempranamente la dominancia de eje para una respuesta ágil.
    * @param {TouchEvent} event - Evento touchmove.
    * @returns {void}
    */
   const handleTouchMove = (event) => {
-    // Si el toque ya fue bloqueado como vertical, SIEMPRE cancelamos el arrastre nativo,
-    // incluso después de haber ejecutado el snap y mientras el dedo siga apoyado
-    if (touchAxisLock === "vertical") {
-      if (event.cancelable) {
-        event.preventDefault();
-      }
+    if (event.cancelable) {
+      event.preventDefault();
     }
 
-    if (!touchStartCoords || !event.touches || event.touches.length === 0) {
-      return;
-    }
+    if (!touchStartCoords || !event.touches || event.touches.length === 0) return;
 
     const touch = event.touches[0];
     const deltaX = touch.clientX - touchStartCoords.x;
@@ -237,55 +273,28 @@ export const Navigation = (() => {
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
 
-    // 1. Detección temprana de eje: Se bloquea con apenas 4px de desplazamiento vertical
     if (!touchAxisLock) {
-      if (absDeltaY > absDeltaX && absDeltaY >= 4) {
+      if (absDeltaY > absDeltaX && absDeltaY >= 8) {
         touchAxisLock = "vertical";
-        if (event.cancelable) {
-          event.preventDefault();
-        }
-      } else if (absDeltaX > absDeltaY && absDeltaX >= 6) {
+      } else if (absDeltaX > absDeltaY && absDeltaX >= 8) {
         touchAxisLock = "horizontal";
-      }
-    }
-
-    // 2. Ejecución vertical: Bloqueo continuo del drag y disparo de snap temprano
-    if (touchAxisLock === "vertical") {
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-
-      // Disparo temprano de snap a la sección contigua (18px)
-      if (
-        !touchSnapTriggered &&
-        absDeltaY >= CONFIG.verticalSwipeThreshold &&
-        !isSnapScrolling
-      ) {
-        touchSnapTriggered = true;
-        const direction = deltaY < 0 ? 1 : -1;
-        snapToSection(direction);
       }
     }
   };
 
   /**
-   * Evalúa el desplazamiento del gesto táctil y aplica transición cartesiana si cumple los criterios.
-   * @param {TouchEvent} event - Evento táctil de finalización.
+   * Evalúa el gesto táctil al levantar el dedo y ejecuta la transición cartesiana correspondiente.
+   * @param {TouchEvent} event - Evento touchend.
    * @returns {void}
    */
   const handleTouchEnd = (event) => {
     const coords = touchStartCoords;
     const axisLock = touchAxisLock;
-    const snapTriggered = touchSnapTriggered;
 
-    // Reseteo de flags del toque al levantar el dedo
     touchStartCoords = null;
     touchAxisLock = null;
-    touchSnapTriggered = false;
 
-    if (!coords || !event.changedTouches || event.changedTouches.length === 0) {
-      return;
-    }
+    if (!coords || !event.changedTouches || event.changedTouches.length === 0) return;
 
     const touch = event.changedTouches[0];
     const deltaX = touch.clientX - coords.x;
@@ -293,7 +302,7 @@ export const Navigation = (() => {
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
 
-    // Caso 1: Gesto horizontal dominante (cambio de panel H0 <-> H1)
+    // Caso 1: Gesto horizontal dominante (H0 <-> H1)
     if (
       axisLock === "horizontal" ||
       (absDeltaX >= CONFIG.swipeThreshold && absDeltaX > absDeltaY)
@@ -307,135 +316,95 @@ export const Navigation = (() => {
       const currentPanel = rail.dataset.activePanel === "1" ? 1 : 0;
 
       if (deltaX < 0 && currentPanel === 0) {
-        // Desplazamiento hacia la izquierda -> avanzar al panel derecho (H1)
         setHorizontalPanel(/** @type {HTMLElement} */ (rail), 1, false);
       } else if (deltaX > 0 && currentPanel === 1) {
-        // Desplazamiento hacia la derecha -> regresar al panel izquierdo (H0)
         setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, false);
       }
       return;
     }
 
-    // Caso 2: Gesto vertical rápido (flick) que no alcanzó a dispararse en touchmove
+    // Caso 2: Gesto vertical dominante (Sección siguiente o anterior)
     if (
-      !snapTriggered &&
-      (axisLock === "vertical" || absDeltaY > absDeltaX) &&
-      absDeltaY >= CONFIG.verticalSwipeThreshold &&
-      !isSnapScrolling
+      axisLock === "vertical" ||
+      (absDeltaY >= CONFIG.verticalSwipeThreshold && absDeltaY > absDeltaX)
     ) {
-      snapToSection(deltaY < 0 ? 1 : -1);
+      if (isVerticalTransitioning) return;
+      const direction = deltaY < 0 ? 1 : -1;
+      setVerticalSection(activeVerticalIndex + direction);
     }
   };
 
   /**
-   * Resetea silenciosamente secciones fuera del viewport (Anticubo de Rubik)
-   * y sincroniza la sección activa en los enlaces de la barra de navegación.
-   * @param {IntersectionObserverEntry[]} entries - Entradas de intersección reportadas.
+   * Manejador de navegación por teclado accesible.
+   * @param {KeyboardEvent} event - Evento de teclado.
    * @returns {void}
    */
-  const handleIntersection = (entries) => {
-    if (!Array.isArray(entries) || entries.length === 0) return;
+  const handleKeyDown = (event) => {
+    const activeEl = document.activeElement;
+    if (
+      activeEl &&
+      (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")
+    ) {
+      return;
+    }
 
-    entries.forEach((entry) => {
-      const section = /** @type {HTMLElement} */ (entry.target);
-      if (!section) return;
+    switch (event.key) {
+      case "ArrowDown":
+      case "PageDown":
+        event.preventDefault();
+        setVerticalSection(activeVerticalIndex + 1);
+        break;
 
-      const rail = section.querySelector(".rail-horizontal");
-      const sectionId = section.getAttribute("id");
+      case "ArrowUp":
+      case "PageUp":
+        event.preventDefault();
+        setVerticalSection(activeVerticalIndex - 1);
+        break;
 
-      // Regla de Reseteo Automático: Cuando abandona completamente el viewport
-      if (!entry.isIntersecting && rail) {
-        const isRightPanel =
-          rail.getAttribute("data-active-panel") === "1" ||
-          rail.classList.contains("is-active-right");
+      case "Home":
+        event.preventDefault();
+        setVerticalSection(0);
+        break;
 
-        if (isRightPanel) {
-          setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, true);
+      case "End": {
+        event.preventDefault();
+        const sections = document.querySelectorAll(".section-v");
+        setVerticalSection(sections.length - 1);
+        break;
+      }
+
+      case "ArrowRight": {
+        const sections = document.querySelectorAll(".section-v");
+        const currentSec = sections[activeVerticalIndex];
+        if (currentSec) {
+          const rail = currentSec.querySelector(".rail-horizontal");
+          if (rail) {
+            setHorizontalPanel(/** @type {HTMLElement} */ (rail), 1, false);
+          }
         }
+        break;
       }
 
-      // Sincronización de enlace activo en la navegación
-      if (
-        entry.isIntersecting &&
-        entry.intersectionRatio >= CONFIG.intersectionThreshold &&
-        sectionId
-      ) {
-        const navLinks = document.querySelectorAll(".app-nav .nav-link");
-        navLinks.forEach((link) => {
-          const href = link.getAttribute("href");
-          const isTarget = href === `#${sectionId}`;
-          link.classList.toggle("is-active", isTarget);
-        });
-      }
-    });
-  };
-
-  /**
-   * Actualiza el desplazamiento vertical contra-inercial de los textos (Vertical Counter-Parallax).
-   * Cuando un div sube, su texto desciende; y el div que entra desde abajo recibe su texto descendiendo desde arriba.
-   * Se ejecuta simultáneamente en ambos paneles hermanos (.panel-v-motion) para total independencia cartesiana.
-   * Elimina el repintado de opacidad cuadro a cuadro para mantener nitidez tipográfica absoluta en pantallas móviles.
-   * @returns {void}
-   */
-  const updateVerticalParallax = () => {
-    verticalRafId = null;
-
-    const viewportTrack = document.getElementById("viewportTrack");
-    if (!viewportTrack) return;
-
-    const trackHeight = viewportTrack.clientHeight || window.innerHeight;
-    if (trackHeight <= 0) return;
-
-    const scrollTop = viewportTrack.scrollTop;
-    const scrollRatio = scrollTop / trackHeight;
-    const travelMultiplier = 1.35;
-    const travelDistance = travelMultiplier * trackHeight;
-    const sections = viewportTrack.querySelectorAll(".section-v");
-
-    sections.forEach((section, index) => {
-      const py = index - scrollRatio;
-
-      let yOffset = 0;
-      let isVisible = true;
-
-      if (py <= -1) {
-        yOffset = travelDistance;
-        isVisible = false;
-      } else if (py >= 1) {
-        yOffset = -travelDistance;
-        isVisible = false;
-      } else {
-        yOffset = -py * travelDistance;
-        isVisible = true;
-      }
-
-      const transformStr = `translate3d(0, ${Math.round(yOffset)}px, 0)`;
-      const motionWrappers = section.querySelectorAll(".panel-v-motion");
-      motionWrappers.forEach((wrapper) => {
-        /** @type {HTMLElement} */ (wrapper).style.transform = transformStr;
-        // Solo alternar opacidad cuando entra o sale completamente del viewport,
-        // NUNCA mutar la opacidad cuadro a cuadro para evitar la invalidación de caché de fuentes en móviles
-        const targetOpacity = isVisible ? "1" : "0";
-        if (/** @type {HTMLElement} */ (wrapper).style.opacity !== targetOpacity) {
-          /** @type {HTMLElement} */ (wrapper).style.opacity = targetOpacity;
+      case "ArrowLeft": {
+        const sections = document.querySelectorAll(".section-v");
+        const currentSec = sections[activeVerticalIndex];
+        if (currentSec) {
+          const rail = currentSec.querySelector(".rail-horizontal");
+          if (rail) {
+            setHorizontalPanel(/** @type {HTMLElement} */ (rail), 0, false);
+          }
         }
-      });
-    });
-  };
+        break;
+      }
 
-  /**
-   * Manejador pasivo del scroll en el track vertical con throttling por requestAnimationFrame.
-   * @returns {void}
-   */
-  const handleVerticalScroll = () => {
-    if (verticalRafId === null) {
-      verticalRafId = requestAnimationFrame(updateVerticalParallax);
+      default:
+        break;
     }
   };
 
   /**
-   * Inicializa los controles del menú desplegable inferior para dispositivos móviles.
-   * Mantiene los íconos ocultos por defecto y expone un botón para desplegar/cerrar.
+   * Inicializa los controles del menú desplegable inferior para dispositivos móviles
+   * y delega los eventos de clic en los enlaces de navegación.
    * @returns {void}
    */
   const setupMobileMenu = () => {
@@ -463,7 +432,6 @@ export const Navigation = (() => {
       );
     };
 
-    // Evento de clic en el botón expuesto
     toggleBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleMenu();
@@ -471,7 +439,6 @@ export const Navigation = (() => {
 
     /**
      * Manejador para la selección de enlaces en la navegación (Desktop y Móvil).
-     * Ejecuta scroll suave programático y remueve el foco para evitar halos congelados.
      * @param {MouseEvent} event - Evento del clic.
      * @returns {void}
      */
@@ -486,15 +453,24 @@ export const Navigation = (() => {
       const targetSection = document.querySelector(href);
       if (targetSection) {
         event.preventDefault();
-        targetSection.scrollIntoView({ behavior: "smooth" });
+        const sections = Array.from(document.querySelectorAll(".section-v"));
+        const targetIndex = sections.indexOf(/** @type {HTMLElement} */ (targetSection));
+        if (targetIndex !== -1) {
+          setVerticalSection(targetIndex);
+        }
       }
 
-      // Desenfocar inmediatamente para limpiar pseudo-estados :focus/:active
       link.blur();
       toggleMenu(false);
     };
 
     navList.addEventListener("click", handleNavLinkClick);
+
+    // Delegar clics en cualquier enlace de navegación que no esté en navList (ej. escritorio)
+    const appNav = document.querySelector(".app-nav");
+    if (appNav) {
+      appNav.addEventListener("click", handleNavLinkClick);
+    }
 
     // Cerrar menú al hacer clic fuera
     document.addEventListener("click", (event) => {
@@ -505,7 +481,7 @@ export const Navigation = (() => {
       }
     });
 
-    // Desenfocar cualquier enlace si se suelta el puntero fuera tras un intento de arrastre
+    // Desenfocar elementos tras interacción táctil
     document.addEventListener("pointerup", () => {
       const activeEl = document.activeElement;
       if (
@@ -517,18 +493,7 @@ export const Navigation = (() => {
       }
     });
 
-    // Prevenir el arrastre nativo (HTML5 Drag & Drop) que congela elementos de UI
-    document.addEventListener("dragstart", (event) => {
-      const target = /** @type {HTMLElement} */ (event.target);
-      if (
-        target &&
-        (target.closest(".app-nav") || target.closest(".btn-nav-h"))
-      ) {
-        event.preventDefault();
-      }
-    });
-
-    // Cerrar con la tecla Escape
+    // Cerrar menú con tecla Escape
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         toggleMenu(false);
@@ -537,21 +502,27 @@ export const Navigation = (() => {
   };
 
   /**
-   * Inicializa los escuchadores de eventos y observadores de intersección.
+   * Inicializa el controlador cartesiano, vincula los escuchadores de eventos
+   * y posiciona el estado inicial de la matriz 2D.
    * @returns {void}
    */
   const init = () => {
     const viewportTrack = document.getElementById("viewportTrack");
+    const railVertical = document.getElementById("railVertical");
     const sections = document.querySelectorAll(".section-v");
 
-    if (!viewportTrack || sections.length === 0) {
+    if (!viewportTrack || !railVertical || sections.length === 0) {
       return;
     }
 
     // 1. Delegación de clics en botones de cambio horizontal
     viewportTrack.addEventListener("click", handleButtonClick);
 
-    // 2. Detección de gestos táctiles (Mobile Swipe Horizontal + Snap Vertical Obligatorio)
+    // 2. Control de desplazamiento vertical por rueda del ratón con candado cinemático
+    viewportTrack.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("wheel", handleWheel, { passive: false });
+
+    // 3. Reconocimiento de gestos táctiles (Swipe Vertical / Horizontal)
     viewportTrack.addEventListener("touchstart", handleTouchStart, {
       passive: true,
     });
@@ -562,50 +533,27 @@ export const Navigation = (() => {
       passive: true,
     });
 
-    // 3. Configuración del IntersectionObserver (Anticubo de Rubik y Sync de Navegación)
-    const observerOptions = {
-      root: viewportTrack,
-      threshold: [0, CONFIG.intersectionThreshold],
-    };
+    // 4. Navegación por teclado
+    window.addEventListener("keydown", handleKeyDown);
 
-    sectionObserver = new IntersectionObserver(
-      handleIntersection,
-      observerOptions,
-    );
-    sections.forEach((section) => sectionObserver.observe(section));
-
-    // 4. Cinemática Vertical: Counter-Parallax reactivo a 60fps
-    viewportTrack.addEventListener("scroll", handleVerticalScroll, {
-      passive: true,
-    });
-    window.addEventListener("scroll", handleVerticalScroll, { passive: true });
-    window.addEventListener("resize", handleVerticalScroll, { passive: true });
-    updateVerticalParallax();
-    requestAnimationFrame(updateVerticalParallax);
-
-    // 5. Inicialización del menú táctil inferior en móvil
+    // 5. Menú táctil inferior y enlaces de barra de navegación
     setupMobileMenu();
+
+    // 6. Aplicar posición inicial silenciosamente (Sección 0, Panel Izquierdo)
+    setVerticalSection(0, true);
   };
 
   /**
-   * Destruye observadores y limpia referencias para evitar fugas de memoria si fuese necesario.
+   * Destruye escuchadores de eventos y limpia referencias para evitar fugas de memoria.
    * @returns {void}
    */
   const destroy = () => {
-    if (verticalRafId !== null) {
-      cancelAnimationFrame(verticalRafId);
-      verticalRafId = null;
-    }
-    window.removeEventListener("scroll", handleVerticalScroll);
-    window.removeEventListener("resize", handleVerticalScroll);
+    window.removeEventListener("wheel", handleWheel);
+    window.removeEventListener("keydown", handleKeyDown);
 
-    if (sectionObserver) {
-      sectionObserver.disconnect();
-      sectionObserver = null;
-    }
     const viewportTrack = document.getElementById("viewportTrack");
     if (viewportTrack) {
-      viewportTrack.removeEventListener("scroll", handleVerticalScroll);
+      viewportTrack.removeEventListener("wheel", handleWheel);
       viewportTrack.removeEventListener("click", handleButtonClick);
       viewportTrack.removeEventListener("touchstart", handleTouchStart);
       viewportTrack.removeEventListener("touchmove", handleTouchMove);
@@ -617,6 +565,7 @@ export const Navigation = (() => {
     init,
     destroy,
     setHorizontalPanel,
+    setVerticalSection,
   });
 })();
 

@@ -75,15 +75,17 @@
   <!-- Viewport Track (Scroll-Snap Vertical)                                  -->
   <!-- ====================================================================== -->
   <main class="viewport-track" id="viewportTrack">
+    <div class="rail-vertical" id="railVertical">
 
     <!-- -------------------------------------------------------------------- -->
     <!-- -------------------------------------------------------------------- -->
     <!-- 01. SECCIÓN: ONBOARDING                                              -->
     <!-- -------------------------------------------------------------------- -->
-    <section class="section-v" id="onboarding" data-section="onboarding" aria-label="Sección 1: Onboarding">
+    <section class="section-v" id="onboarding" data-section="onboarding" data-v-state="active" aria-label="Sección 1: Onboarding">
       <div class="rail-horizontal" data-active-panel="0">
         <!-- Panel Izquierdo (Default) -->
         <article class="panel-h" data-panel="left">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Noche urbana</span>
@@ -105,6 +107,7 @@
 
         <!-- Panel Derecho (Secundario) -->
         <article class="panel-h" data-panel="right">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Luz de día</span>
@@ -129,10 +132,11 @@
     <!-- -------------------------------------------------------------------- -->
     <!-- 02. SECCIÓN: MANIFIESTO                                               -->
     <!-- -------------------------------------------------------------------- -->
-    <section class="section-v" id="manifesto" data-section="manifesto" aria-label="Sección 2: Manifiesto">
+    <section class="section-v" id="manifesto" data-section="manifesto" data-v-state="next" aria-label="Sección 2: Manifiesto">
       <div class="rail-horizontal" data-active-panel="0">
         <!-- Panel Izquierdo (Default) -->
         <article class="panel-h" data-panel="left">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Historia & Origen</span>
@@ -154,6 +158,7 @@
 
         <!-- Panel Derecho (Secundario) -->
         <article class="panel-h" data-panel="right">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Comunidad & Cultura</span>
@@ -178,10 +183,11 @@
     <!-- -------------------------------------------------------------------- -->
     <!-- 03. SECCIÓN: GEAR & MERCH                                             -->
     <!-- -------------------------------------------------------------------- -->
-    <section class="section-v" id="gear" data-section="gear" aria-label="Sección 3: Equipo y Merch">
+    <section class="section-v" id="gear" data-section="gear" data-v-state="next" aria-label="Sección 3: Equipo y Merch">
       <div class="rail-horizontal" data-active-panel="0">
         <!-- Panel Izquierdo (Default) -->
         <article class="panel-h" data-panel="left">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Hardware & Protección</span>
@@ -203,6 +209,7 @@
 
         <!-- Panel Derecho (Secundario) -->
         <article class="panel-h" data-panel="right">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Indumentaria Oficial</span>
@@ -227,10 +234,11 @@
     <!-- -------------------------------------------------------------------- -->
     <!-- 04. SECCIÓN: ACADEMIA                                                -->
     <!-- -------------------------------------------------------------------- -->
-    <section class="section-v" id="academy" data-section="academy" aria-label="Sección 4: Academia de Patinaje">
+    <section class="section-v" id="academy" data-section="academy" data-v-state="next" aria-label="Sección 4: Academia de Patinaje">
       <div class="rail-horizontal" data-active-panel="0">
         <!-- Panel Izquierdo (Default) -->
         <article class="panel-h" data-panel="left">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Iniciación y Grupo</span>
@@ -252,6 +260,7 @@
 
         <!-- Panel Derecho (Secundario) -->
         <article class="panel-h" data-panel="right">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Asesoría Avanzada</span>
@@ -276,10 +285,11 @@
     <!-- -------------------------------------------------------------------- -->
     <!-- 05. SECCIÓN: RUTAS                                                   -->
     <!-- -------------------------------------------------------------------- -->
-    <section class="section-v" id="routes" data-section="routes" aria-label="Sección 5: Rutas Urbanas">
+    <section class="section-v" id="routes" data-section="routes" data-v-state="next" aria-label="Sección 5: Rutas Urbanas">
       <div class="rail-horizontal" data-active-panel="0">
         <!-- Panel Izquierdo (Default) -->
         <article class="panel-h" data-panel="left">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Domingos Familiares</span>
@@ -301,6 +311,7 @@
 
         <!-- Panel Derecho (Secundario) -->
         <article class="panel-h" data-panel="right">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Jueves Night Ride</span>
@@ -325,10 +336,11 @@
     <!-- -------------------------------------------------------------------- -->
     <!-- 06. SECCIÓN: BASE CAMP                                               -->
     <!-- -------------------------------------------------------------------- -->
-    <section class="section-v" id="basecamp" data-section="basecamp" aria-label="Sección 6: Base Camp y Comunidad">
+    <section class="section-v" id="basecamp" data-section="basecamp" data-v-state="next" aria-label="Sección 6: Base Camp y Comunidad">
       <div class="rail-horizontal" data-active-panel="0">
         <!-- Panel Izquierdo (Default) -->
         <article class="panel-h" data-panel="left">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Comunidad Oficial</span>
@@ -350,6 +362,7 @@
 
         <!-- Panel Derecho (Secundario) -->
         <article class="panel-h" data-panel="right">
+          <div class="panel-bg" aria-hidden="true"></div>
           <div class="panel-v-motion">
             <div class="panel-content">
               <span class="panel-tag">Contacto & Soporte</span>
@@ -371,6 +384,7 @@
       </div>
     </section>
 
+    </div>
   </main>
 
   <!-- Orquestador Modular Vanilla ES6+ -->
