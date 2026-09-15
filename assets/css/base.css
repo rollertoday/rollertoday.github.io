@@ -42,8 +42,8 @@
 
   /* Cinemática y Aceleración por GPU */
   --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
-  --duration-slide: 1150ms;
-  --duration-fade: 300ms;
+  --duration-slide: 700ms;
+  --duration-fade: 250ms;
 
   /* Colores Neutros y Estructurales */
   --color-dark-surface: #0a0c10;

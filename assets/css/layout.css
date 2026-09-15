@@ -113,8 +113,7 @@
   background-position: center;
   will-change: transform;
   transform: translate3d(0, 0, 0) scale(1);
-  transition: transform var(--duration-slide) var(--ease-out-expo),
-    opacity var(--duration-slide) ease;
+  transition: transform var(--duration-slide) var(--ease-out-expo);
 }
 
 /* Capa 2: Contenedor desacoplado para cinemática vertical (Eje Y) */
@@ -129,6 +128,7 @@
   position: relative;
   z-index: 2;
   will-change: transform, opacity;
+  /* Transición contrainercial agresiva y fluida sincronizada con el riel */
   transition: transform var(--duration-slide) var(--ease-out-expo),
     opacity calc(var(--duration-slide) * 0.75) ease;
   -webkit-font-smoothing: antialiased;
@@ -136,7 +136,7 @@
   text-rendering: optimizeLegibility;
 }
 
-.panel-v-motion > .panel-content {
+.panel-v-motion>.panel-content {
   pointer-events: auto;
 }
 
@@ -144,10 +144,11 @@
 /* Cinemática Vertical por GPU (Counter-Parallax y Capa de Fondo)            */
 /* ========================================================================== */
 
-/* Estado Activo: Sección en pantalla completa */
+/* Estado Activo: Sección centrada en pantalla */
 .section-v[data-v-state="active"] .panel-v-motion {
   transform: translate3d(0, 0, 0);
   opacity: 1;
+  pointer-events: auto;
 }
 
 .section-v[data-v-state="active"] .panel-bg {
@@ -156,28 +157,34 @@
 }
 
 /* Secciones Anteriores (arriba):
-   Al salir la sección hacia arriba, el texto desciende en contrainercia y se desvanece;
-   la capa de fondo sube con una escala sutil (0.3x parallax). */
+   Al salir la sección hacia arriba, el texto es despedido con fuerza hacia abajo (+120dvh)
+   en sentido totalmente contrario al movimiento del div, desvaneciéndose limpiamente. */
 .section-v[data-v-state="prev"] .panel-v-motion {
-  transform: translate3d(0, 50vh, 0);
+  transform: translate3d(0, 120vh, 0);
+  transform: translate3d(0, 120dvh, 0);
   opacity: 0;
+  pointer-events: none;
 }
 
 .section-v[data-v-state="prev"] .panel-bg {
-  transform: translate3d(0, -15vh, 0) scale(1.05);
+  transform: translate3d(0, -15vh, 0);
+  transform: translate3d(0, -15dvh, 0) scale(1.05);
   opacity: 0.7;
 }
 
 /* Secciones Posteriores (abajo):
-   Esperando entrar desde abajo. El texto está arriba para descender al centro;
-   la capa de fondo está abajo para subir suavemente. */
+   Esperando entrar desde abajo. El texto viene proyectado desde arriba (-120dvh)
+   para entrar con fuerza hacia el centro en sentido contrario a la subida del div. */
 .section-v[data-v-state="next"] .panel-v-motion {
-  transform: translate3d(0, -50vh, 0);
+  transform: translate3d(0, -120vh, 0);
+  transform: translate3d(0, -120dvh, 0);
   opacity: 0;
+  pointer-events: none;
 }
 
 .section-v[data-v-state="next"] .panel-bg {
-  transform: translate3d(0, 15vh, 0) scale(1.05);
+  transform: translate3d(0, 15vh, 0);
+  transform: translate3d(0, 15dvh, 0) scale(1.05);
   opacity: 0.7;
 }
 

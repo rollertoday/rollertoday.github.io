@@ -30,8 +30,8 @@ export const Navigation = (() => {
    */
   const CONFIG = Object.freeze({
     swipeThreshold: 40,
-    verticalSwipeThreshold: 40,
-    transitionDurationMs: 800,
+    verticalSwipeThreshold: 70,
+    transitionDurationMs: 100,
   });
 
   /**
@@ -120,7 +120,10 @@ export const Navigation = (() => {
 
     if (!railVertical || sections.length === 0) return;
 
-    const clampedIndex = Math.max(0, Math.min(sections.length - 1, targetIndex));
+    const clampedIndex = Math.max(
+      0,
+      Math.min(sections.length - 1, targetIndex),
+    );
 
     if (clampedIndex === activeVerticalIndex && !silent) return;
 
@@ -265,7 +268,8 @@ export const Navigation = (() => {
       event.preventDefault();
     }
 
-    if (!touchStartCoords || !event.touches || event.touches.length === 0) return;
+    if (!touchStartCoords || !event.touches || event.touches.length === 0)
+      return;
 
     const touch = event.touches[0];
     const deltaX = touch.clientX - touchStartCoords.x;
@@ -294,7 +298,8 @@ export const Navigation = (() => {
     touchStartCoords = null;
     touchAxisLock = null;
 
-    if (!coords || !event.changedTouches || event.changedTouches.length === 0) return;
+    if (!coords || !event.changedTouches || event.changedTouches.length === 0)
+      return;
 
     const touch = event.changedTouches[0];
     const deltaX = touch.clientX - coords.x;
@@ -454,7 +459,9 @@ export const Navigation = (() => {
       if (targetSection) {
         event.preventDefault();
         const sections = Array.from(document.querySelectorAll(".section-v"));
-        const targetIndex = sections.indexOf(/** @type {HTMLElement} */ (targetSection));
+        const targetIndex = sections.indexOf(
+          /** @type {HTMLElement} */ (targetSection),
+        );
         if (targetIndex !== -1) {
           setVerticalSection(targetIndex);
         }
